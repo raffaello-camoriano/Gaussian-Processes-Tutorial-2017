@@ -1,0 +1,85 @@
+clearAllButBP
+close all
+
+%% Make dataset
+
+% Dataset settings
+n = 15;
+nTe = 100;
+m = 0.5;
+q = 1;
+sigma_n = 0.1;
+xMin = -1;
+xMax = 1;
+
+[ X , Y ] = generate_linear_DS(n, m, q, sigma_n, xMin, xMax); % training
+X = [X; ones(size(X))];
+
+[ Xte , Yte ] = generate_linear_DS(nTe, m, q, sigma_n, xMin, xMax); % test
+Xte = [Xte; ones(size(Xte))];
+
+figure
+scatter(X(1,:), Y)
+title('Training set')
+
+%% Compute posterior distribution
+
+% Prior settings
+Sigma_p = eye(2) * 100; % prior over the parameters (since N = 1, Sigma_p is a scalar)
+
+A = 1/(sigma_n^2) * (X * X') + pinv(Sigma_p);
+invA = pinv(A);
+w_mean = 1/(sigma_n^2) * invA * X * Y;
+w_cov = invA;
+
+%% Plot resulting distribution and test predictions
+
+% test grid
+Xgrid = linspace(xMin, xMax, 100);
+Xgrid = [Xgrid; ones(size(Xgrid))];
+
+Ygrid_pred_mean =  Xgrid' * w_mean;
+Ygrid_pred_cov = Xgrid' * w_cov * Xgrid;
+Ygrid_pred_std = sqrt(diag(Ygrid_pred_cov));
+% Ygrid_pred_std = diag(Ygrid_pred_cov)';
+
+% figure
+% hold on
+% title('Predictive distribution')
+% % plot mean
+% plot(Xgrid, Ygrid_pred_mean)
+% % plot +2 std
+% plot(Xgrid, Ygrid_pred_mean + 2 * Ygrid_pred_std, '--b')
+% % plot -2 std
+% plot(Xgrid, Ygrid_pred_mean - 2 * Ygrid_pred_std, '--b')
+
+% test set predictions
+Yte_pred_mean =  Xte' * w_mean;
+Yte_pred_cov = Xte' * w_cov * Xte;
+Yte_pred_std = sqrt(diag(Yte_pred_cov))';
+
+figure
+hold on
+title('Test predictions and predictive distribution')
+% plot mean
+plot(Xgrid(1,:), Ygrid_pred_mean)
+% plot +2 std
+plot(Xgrid(1,:), Ygrid_pred_mean + 2 * Ygrid_pred_std, '--b')
+% plot -2 std
+plot(Xgrid(1,:), Ygrid_pred_mean - 2 * Ygrid_pred_std, '--b')
+% plot test points
+scatter(Xte(1,:), Yte, 'xr')
+% plot predictions
+scatter(Xte(1,:), Yte_pred_mean, 'or')
+% plot connecting lines
+M = [Yte'; Yte_pred_mean'];
+plot([Xte(1,:);Xte(1,:)], M, ':r')
+
+% count the number of test points inside the +-2 STD
+count = 0;
+for i = 1:nTe
+    if ((Yte( >= (Yte_pred_mean - 2 * Yte_pred_std)) && (Yte <= Yte_pred_mean + 2 * Yte_pred_std))
+        count = count + 1;
+    end
+end
+perc = count / nTe
